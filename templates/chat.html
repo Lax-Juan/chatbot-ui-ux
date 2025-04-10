@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}LaxGPT{% endblock %}
+{% block content %}
+<aside class="w-1/4 bg-gray-800 text-white p-4 hidden md:block">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg">Conversaciones</h2>
+      <button onclick="createNewSession()" class="p-1 hover:bg-gray-700 rounded">
+        ➕ Nueva
+      </button>
+    </div>
+    
+    <div id="sessions-list" class="space-y-2">
+      {% for s in sessions %}
+      <div class="flex justify-between items-center p-2 hover:bg-gray-700 rounded cursor-pointer {% if s.uuid == current_session_id %}bg-gray-600{% endif %}" 
+           onclick="loadSession('{{ s.uuid }}')">
+          <span>{{ s.name }}</span>
+          <button onclick="deleteSession(event, '{{ s.uuid }}')" 
+                  class="text-red-400 hover:text-red-300 p-1">
+            🗑
+          </button>
+      </div>
+      {% endfor %}
+    </div>
+  </aside>
+
+<main class="flex-1 flex flex-col">
+    <header class="flex justify-between items-center p-4 border-b bg-white">
+        <div class="text-lg font-semibold">Chat</div>
+        <a href="{{ url_for('logout') }}"
+           class="text-red-600 hover:text-red-800">
+          Cerrar sesión
+        </a>
+      </header>
+  <div id="chat-window" class="flex-1 overflow-auto p-4 space-y-2">
+    <div class="text-sm text-gray-500 mb-4">Session ID: <code>{{ session_id }}</code></div>
+    <!-- Mensajes irán apareciendo aquí -->
+  </div>
+
+  <form id="chat-form" class="p-4 border-t flex" onsubmit="return sendMessage(event)">
+    <input id="chat-input" type="text" placeholder="Escribe un mensaje..." 
+           class="flex-1 p-2 border rounded focus:outline-none"/>
+    <button type="submit" class="ml-2 bg-blue-600 text-white px-4 py-2 rounded">Enviar</button>
+  </form>
+
+  
+</main>
+
+
+  
+
+<script>
+  const sessionId = "{{ session_id }}";
+  async function sendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chat-input');
+    const text  = input.value.trim();
+    if (!text) return;
+    appendMessage('user', text);
+    input.value = '';
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    appendMessage('bot', data.response);
+  }
+
+  function appendMessage(sender, text) {
+    const win = document.getElementById('chat-window');
+    const div = document.createElement('div');
+    div.className = sender === 'user' ? 'text-right' : 'text-left';
+    
+    const span = document.createElement('span');
+    span.className = sender === 'user' 
+        ? 'inline-block p-2 rounded bg-blue-600 text-white'
+        : 'inline-block p-2 rounded bg-gray-200 text-gray-800';
+    
+    // User → texto plano, Bot → HTML
+    if (sender === 'user') {
+        span.textContent = text; 
+    } else {
+        span.innerHTML = text;  // Interpretar como HTML
+    }
+    
+    div.appendChild(span);
+    win.appendChild(div);
+    win.scrollTop = win.scrollHeight;
+}
+
+
+async function createNewSession() {
+    const res = await fetch('/api/session', { method: 'POST' });
+    const data = await res.json();
+    
+    // Actualizar lista de sesiones
+    const sessionsList = document.getElementById('sessions-list');
+    sessionsList.innerHTML = `
+        <div class="flex justify-between items-center p-2 hover:bg-gray-700 rounded cursor-pointer bg-gray-600" 
+             onclick="loadSession('${data.uuid}')">
+            <span>${data.name}</span>
+            <button onclick="deleteSession(event, '${data.uuid}')" 
+                    class="text-red-400 hover:text-red-300 p-1">
+              🗑
+            </button>
+        </div>
+        ${sessionsList.innerHTML}
+    `;
+    
+    // Limpiar chat
+    document.getElementById('chat-window').innerHTML = '';
+    sessionId = data.uuid;
+}
+
+async function deleteSession(event, sessionUuid) {
+    event.stopPropagation();
+    if (confirm('¿Eliminar esta conversación?')) {
+        await fetch(`/api/session`, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ session_id: sessionUuid })
+        });
+        
+        event.target.closest('div').remove();
+    }
+}
+
+async function loadSession(sessionUuid) {
+    sessionId = sessionUuid;
+    const res = await fetch(`/api/messages?session_id=${sessionUuid}`);
+    const messages = await res.json();
+    
+    const chatWindow = document.getElementById('chat-window');
+    chatWindow.innerHTML = '';
+    
+    messages.forEach(msg => {
+        appendMessage(msg.is_bot ? 'bot' : 'user', msg.content);
+    });
+}
+</script>
+{% endblock %}

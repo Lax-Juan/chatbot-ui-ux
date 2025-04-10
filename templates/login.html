@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="m-auto w-full max-w-xs">
+  <form method="post" class="bg-white shadow-md rounded px-8 pt-6 pb-8">
+    <h2 class="text-xl mb-4 text-center">Iniciar sesión</h2>
+    <label class="block">Usuario</label>
+    <input name="username" class="w-full p-2 border rounded mb-4"/>
+    <label class="block">Contraseña</label>
+    <input name="password" type="password" class="w-full p-2 border rounded mb-6"/>
+    <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Entrar</button>
+    <p class="mt-4 text-center">
+      <a href="{{ url_for('register') }}" class="text-blue-600">Crear cuenta</a>
+    </p>
+  </form>
+</div>
+{% endblock %}
